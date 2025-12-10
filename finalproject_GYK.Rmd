@@ -1,0 +1,861 @@
+---
+title: "An Exploration of US HealthCare Utilization, 2023"
+author: "Grace Yeboah-Kodie"
+date: "Due Dec. 9, 2025"
+output:
+  html_document: default
+  pdf_document: default
+subtitle: BIOS 512 Final Project
+---
+
+| Table of Contents  | 
+|------------------------|
+| **Overview**          | 
+|    Datasets           | 
+|    Analysis Goals     | 
+| **Question 1: Characterizing Healthcare Users**  |
+|   *Sub-question 1.1*     |
+|     Preliminary Visualizations     | 
+|   *Sub-question 1.2*     |
+|     Principle Component Analysis   | 
+|     K-Means Clustering             | 
+| **Question 2: Understanding Self-Reported Health**  | 
+|   *Sub-question 2.1*     |
+|     Preliminary Visualizations     | 
+|   *Sub-question 2.2*     |
+|     Logistic Regression            | 
+| **Conclusion**        | 
+
+
+---
+
+# Overview
+## Analysis Goals
+In conducting this analysis, my overarching aim was to explore patterns of healthcare utilization in the United States (US) in 2023. Topics of particular interest to me included healthcare expenditures, demographics and other social determinants of health, insurance coverage, and self-reported perceptions about insurance and health. My main questions were as follows:
+
+- **Question 1:** Who is utilizing what kind of care? In other words: How can different subgroups of healthcare users be characterized?
+  - *Sub-question 1.1:* Which groups of individuals have the highest and lowest healthcare spending? 
+  - *Sub-question 1.2:* How do subgroups of individuals differ in their patterns of healthcare use?
+- **Question 2:** Does self-reported health align with actual utilization?
+  - *Sub-question 2.1:* How do measures of utilization align with respondents' beliefs about their own health or their need for insurance?
+  - *Sub-question 2.2:* Which demographic or healthcare utilization characteristics predict self-reported fair/poor health?
+
+## Datasets
+I utilized data from the Medical Expenditure Panel Survey (MEPS). MEPS is a national survey conducted annually to collect information on healthcare utilization, health services expenditures, and healthcare payers in the US. Specifically, I worked with the following two MEPS datasets from 2023 (the most recent data available):
+
+**MEPS HC-251 - 2023 Full Year Consolidated Data File:** These data come from surveys administered to US individuals on topics such as demographics, health conditions, overall health status, access to care, patient satisfaction, disability, quality of care, employment, and health insurance coverage during 2023. Each observation is a household respondent. While the full dataset has 1374 variables, the following variables were of priority interest to my analysis:
+
+| Variable Name       | Type        | Description |
+|--------------------|-------------|-------------|
+| region             | Categorical | Census region of residence (1 = Northeast, 2 = Midwest, 3 = South, 4 = West) |
+| age                | Numeric     | Age in years |
+| age_cat            | Categorical | Age category (1 = 0–17, 2 = 18–44, 3 = 45–64, 4 = 65+) |
+| sex                | Binary      | Sex (1 = Male, 2 = Female) |
+| race               | Categorical | Race/ethnicity category (1 = Hispanic, 2 = NH White, 3 = NH Black, 4 = NH Asian, 5 = NH Other/Multiple) |
+| bornusa            | Binary      | Born in the USA? (0 = No, 1 = Yes) |
+| deg_cat            | Categorical | Highest level of education (1 = Less than high school, 3 = High school diploma, 4 = Bachelor's degree, 5 = Master's degree, 6 = Doctorate degree, 7 = Other degree) |
+| income             | Numeric     | Total household annual income |
+| fpl_cat            | Categorical | Income category relative to the Federal Poverty Line (FPL) (1 = Poor, 2 = Near Poor, 3 = Low Income, 4 = Middle Income, 5 = High Income ) |
+| insurance          | Categorical | Insurance coverage (1 = Private, 2 = Public, 3 = Uninsured) |
+| yrexpenditures     | Numeric     | Total annual healthcare expenditures |
+| num_physvis        | Numeric     | Number of physician visits |
+| num_hosp           | Numeric     | Number of hospital visits |
+| num_er             | Numeric     | Number of ER visits |
+| num_prescmeds      | Numeric     | Number of prescription medications |
+| healthstatus       | Categorical | Self-reported health status (1 = Excellent, 2 = Very Good, 3 = Good, 2 = Fair, 1 = Poor) |
+| healthstatus2      | Binary      | Binary self-reported health status (0 = Excellent/Very good/Good, 1 = Fair/Poor) |
+| delayforcost       | Binary      | Delayed care due to cost? (0 = No, 1 = Yes) |
+| ins_dontneed       | Categorical | Insurance not needed? (1 = Disagree strongly, 2 = Disagree somewhat, 3 = Uncertain, 4 = Agree somewhat, 5 = Agree strongly) |
+| ins_dontneed2       | Categorical | Collapsed “Insurance not needed?” Answer (1 = Disagree, 2 = Uncertain, 3 = Agree) |
+| ins_notworth       | Categorical | Insurance not worth it? (1 = Disagree strongly, 2 = Disagree somewhat, 3 = Uncertain, 4 = Agree somewhat, 5 = Agree strongly) |
+| ins_notworth2       | Categorical | Collapsed “Insurance not worth it?” Answer (1 = Disagree, 2 = Uncertain, 3 = Agree) |
+
+
+**MEPS HC-248g - 2023 Office-Based Medical Provider Visits:** These data come from surveys administered to providers and US households on office-based medical visits in 2023. Data collected relate to visit information, including information about type of provider seen, services, costs, and payment. Each observation is a visit to an office-based medical provider; MEPS respondents can have multiple visits recorded. I created "patient flags" so that each observation would indicate if the patient at that visit had ever received any of the following services in the year 2023:
+
+| Variable Name       | Type       | Description                                           |
+|--------------------|-----------|------------------------------------------------------
+| ever_labs          | Binary    | Ever had lab tests (0 = No, 1 = Yes)                 |
+| ever_vax           | Binary    | Ever received vaccinations (0 = No, 1 = Yes)         |
+| ever_mammog        | Binary    | Ever had a mammogram (0 = No, 1 = Yes)               |
+| ever_mri           | Binary    | Ever had an MRI (0 = No, 1 = Yes)                    |
+| ever_xray          | Binary    | Ever had an X-ray (0 = No, 1 = Yes)                  |
+| ever_ekg           | Binary    | Ever had an EKG (0 = No, 1 = Yes)                    |
+| ever_sonogram      | Binary    | Ever had a sonogram (0 = No, 1 = Yes)                |
+| ever_surgproc      | Binary    | Ever had surgery (0 = No, 1 = Yes)                   |
+| ever_medpresc      | Binary    | Ever had medication prescribed (0 = No, 1 = Yes)     |
+| ever_tele          | Binary    | Ever used telehealth (0 = No, 1 = Yes)               |
+
+
+I then merged on the MEPS user ID to link the "ever___" patient flag variables to the individual-level data in the HC-251: Full Year Consolidated Data File. With this combined dataset, I performed analyses to better understand healthcare utilization in 2023.
+
+
+```{r 1, echo=FALSE}
+library(foreign) 
+library(devtools)
+library(tidyverse)
+library(readr)
+library(readxl)
+library(haven)
+library(survey)
+library(readxl)
+library(dplyr)
+library(factoextra)
+library(fastDummies)
+library(reshape2)
+library(Rtsne)
+library(ggcorrplot)
+library(glmnet)
+library(pROC)
+library(broom)
+library(forcats)
+library(haven)
+
+```
+
+```{r 2, echo=FALSE}
+h248g = read_excel("C:/Users/gryeboah/Desktop/gillings/2_fall/bios512/finalproject/h248g.xlsx")
+# LINK FOR full hc248g: https://meps.ahrq.gov/data_stats/download_data_files_detail.jsp?cboPufNumber=HC-251
+
+h251 = read_excel("C:/Users/gryeboah/Desktop/gillings/2_fall/bios512/finalproject/h251.xlsx")
+# LINK FOR full hc251: https://meps.ahrq.gov/data_stats/download_data_files_detail.jsp?cboPufNumber=HC-248G
+
+# Prepare datasets 
+h248g_keep <- h248g %>% select(DUID:DUPERSID, LABTEST_M18, RCVVAC_M18, MAMMOG_M18, MRI_M18, XRAYS_M18,
+                               EKG_M18, SONOGRAM_M18, SURGPROC, MEDPRESC, TELEHEALTHFLAG)
+
+h251_keep <- h251 %>% select(DUID:DUPERSID, DATAYEAR, REGION23, AGE23X, SEX, RACETHX, BORNUSA, HIDEG, 
+                             ADHECR42, ADINSA42, ADINSB42, INSCOV23, RTHLTH31, TOTEXP23, ERTOT23, IPDIS23,
+                             OBDRV23, OBTOTV23, RXTOT23, TTLP23X, POVCAT23, AFRDCA42, DLAYCA42)
+
+patient_flags <- h248g %>%
+  group_by(DUPERSID) %>%
+  summarize(
+    ever_labs = as.integer(any(LABTEST_M18 == 1)),
+    ever_vax = as.integer(any(RCVVAC_M18 == 1)),
+    ever_mammog = as.integer(any(MAMMOG_M18 == 1)),
+    ever_mri = as.integer(any(MRI_M18 == 1)),
+    ever_xray = as.integer(any(XRAYS_M18 == 1)),
+    ever_ekg = as.integer(any(EKG_M18 == 1)),
+    ever_sonogram = as.integer(any(SONOGRAM_M18 == 1)),
+    ever_surgproc = as.integer(any(SURGPROC == 1)),
+    ever_medpresc = as.integer(any(MEDPRESC == 1)),
+    ever_tele = as.integer(any(TELEHEALTHFLAG == 1))
+  )
+
+# Merge h251, h248g, and patient flags
+ptmeps0 <- h251_keep %>%
+  left_join(h248g_keep, by = "DUPERSID")
+
+ptmeps0 <- h251_keep %>%
+  left_join(patient_flags, by = "DUPERSID")
+```
+
+```{r 3, echo=FALSE}
+# Clean/update variables and variable names for use
+ptmeps <- ptmeps0 %>%
+  mutate(
+    
+    # h251 patient characteristics
+    region = case_when(REGION23==-1 ~ "Inapplicable", REGION23==1 ~ "Northeast",
+                       REGION23==2 ~ "Midwest", REGION23==3 ~ "South",
+                       REGION23==4 ~ "West"), 
+    age = AGE23X,
+    age_cat = case_when(AGE23X < 18 ~ "0–17", AGE23X < 45 ~ "18–44", 
+                        AGE23X < 65 ~ "45–64", AGE23X >= 65 ~ "65+"),
+    sex = case_when(SEX==1 ~ "Male", SEX==2 ~ "Female"),
+    race = case_when(RACETHX == 1 ~ "Hispanic", RACETHX == 2 ~ "Non-Hispanic White", 
+                     RACETHX == 3 ~ "Non-Hispanic Black", 
+                     RACETHX == 4 ~ "Non-Hispanic Asian", 
+                     RACETHX == 5 ~ "Non-Hispanic Other or Multiple"),
+    bornusa = case_when(BORNUSA<0 ~ NA_character_, BORNUSA==1 ~ "Yes", 
+                        BORNUSA==2 ~ "No"),
+    deg_cat = case_when(HIDEG %in% c(-7, -8) ~ NA_character_,
+                        HIDEG == 8 ~ "Inapplicable (<16)", 
+                        HIDEG %in% c(1, 2) ~ "Less than high school",
+                        HIDEG == 3 ~ "High school diploma",
+                        HIDEG == 4 ~ "Bachelor's degree",
+                        HIDEG == 5 ~ "Master's degree",
+                        HIDEG == 6 ~ "Doctorate degree",
+                        HIDEG == 7 ~ "Other degree"),
+    insurance = case_when(INSCOV23 == 1 ~ "Private", INSCOV23 == 2 ~ "Public",
+                          INSCOV23 == 3 ~ "Uninsured", TRUE ~ "Other"),
+    income = TTLP23X,
+    fpl_cat = case_when(POVCAT23==1 ~ "Poor", POVCAT23==2 ~ "Near Poor",
+                        POVCAT23==3 ~ "Low Income", POVCAT23==4 ~ "Middle Income",
+                        POVCAT23==5 ~ "High Income"),
+    
+    # h251 survey responses
+    ins_dontneed = case_when(ADINSA42 %in% c(-1, -15) ~ NA_character_,
+                             ADINSA42 == 1 ~ "Disagree strongly",
+                             ADINSA42 == 2 ~ "Disagree somewhat",
+                             ADINSA42 == 3 ~ "Uncertain",
+                             ADINSA42 == 4 ~ "Agree somewhat",
+                             ADINSA42 == 5 ~ "Agree strongly"),
+    ins_notworth = case_when(ADINSB42 %in% c(-1, -15) ~ NA_character_,
+                             ADINSB42 == 1 ~ "Disagree strongly",
+                             ADINSB42 == 2 ~ "Disagree somewhat",
+                             ADINSB42 == 3 ~ "Uncertain",
+                             ADINSB42 == 4 ~ "Agree somewhat",
+                             ADINSB42 == 5 ~ "Agree strongly"),
+    ins_dontneed2 = case_when(ADINSA42 %in% c(-1, -15) ~ NA_character_,
+                              ADINSA42 %in% c(1, 2) ~ "Disagree", 
+                              ADINSA42 == 3 ~ "Uncertain",
+                              ADINSA42 %in% c(4, 5) ~ "Agree"),
+    ins_notworth2 = case_when(ADINSB42 %in% c(-1, -15) ~ NA_character_,
+                              ADINSB42 %in% c(1, 2) ~ "Disagree", 
+                              ADINSB42 == 3 ~ "Uncertain",
+                              ADINSB42 %in% c(4, 5) ~ "Agree"),
+    healthstatus = case_when(RTHLTH31 %in% c(-8, -7, -1) ~ NA_character_,
+                             RTHLTH31 == 1 ~ "Excellent",
+                             RTHLTH31 == 2 ~ "Very good",
+                             RTHLTH31 == 3 ~ "Good",
+                             RTHLTH31 == 4 ~ "Fair",
+                             RTHLTH31 == 5 ~ "Poor"),
+    healthstatus2 = case_when(RTHLTH31 %in% c(-8, -7, -1) ~ NA_character_,
+                             RTHLTH31 %in% c(1, 2, 3) ~ "Excellent, Very Good, or Good",
+                             RTHLTH31 %in% c(4, 5) ~ "Fair or Poor"),
+    yrexpenditures = TOTEXP23,
+    yrexpend_cat = case_when(TOTEXP23 == 0 ~ "0",
+                             TOTEXP23 <= 738 ~ "Q1: 1–738",
+                             TOTEXP23 <= 2668 ~ "Q2: 739–2668",
+                             TOTEXP23 <= 8727 ~ "Q3: 2669–8727",
+                             TRUE ~ "Q4: 8728+"),
+    delayforcost = case_when(DLAYCA42==1 ~ "Yes", DLAYCA42==2 ~ "No"),
+    
+    # h251 types of visits
+    num_er = ERTOT23,
+    num_hosp = IPDIS23,
+    num_physvis = OBDRV23,
+    num_providvis = OBTOTV23,
+    num_prescmeds = RXTOT23,
+    
+    # h248g ever visit patient flags
+    labs = if_else(ever_labs == 1, "Yes", "No"),
+    vax = if_else(ever_vax == 1, "Yes", "No"),
+    mammog = if_else(ever_mammog == 1, "Yes", "No"),
+    mri = if_else(ever_mri == 1, "Yes", "No"),
+    xray = if_else(ever_xray == 1, "Yes", "No"),
+    ekg = if_else(ever_ekg == 1, "Yes", "No"),
+    sonogram = if_else(ever_sonogram == 1, "Yes", "No"),
+    surgproc = if_else(ever_surgproc == 1, "Yes", "No"),
+    medpresc = if_else(ever_medpresc == 1, "Yes", "No"),
+    telehealth = if_else(ever_tele == 1, "Yes", "No")
+  ) %>%
+  
+# order factor levels and reference levels
+  
+mutate(
+  region = factor(region,
+                  levels = c("Northeast", "Midwest", "South", "West", "Inapplicable")),
+  
+  age_cat = factor(age_cat,
+                   levels = c("0–17", "18–44", "45–64", "65+"),
+                   ordered = TRUE),
+  
+  sex = factor(sex, levels = c("Male", "Female")),   
+  
+  race = factor(race, levels = c(
+    "Non-Hispanic White",
+    "Hispanic",
+    "Non-Hispanic Black",
+    "Non-Hispanic Asian",
+    "Non-Hispanic Other or Multiple"
+  )),
+  
+  bornusa = factor(bornusa, levels = c("Yes", "No")),   
+  
+  deg_cat = factor(deg_cat, levels = c(
+    "Bachelor's degree",            
+    "Less than high school",
+    "High school diploma",
+    "Master's degree",
+    "Doctorate degree",
+    "Other degree",
+    "Inapplicable (<16)"
+  ), ordered = FALSE),
+  
+  insurance = factor(insurance,
+                     levels = c("Private", "Public", "Uninsured", "Other")), 
+  
+  fpl_cat = factor(fpl_cat,
+                   levels = c("High Income", "Middle Income", "Low Income",
+                              "Near Poor", "Poor"),
+                   ordered = TRUE),
+  
+  ins_dontneed = factor(ins_dontneed,
+                        levels = c("Disagree strongly", "Disagree somewhat",
+                                   "Uncertain", "Agree somewhat", "Agree strongly"),
+                        ordered = TRUE),
+  
+  ins_notworth = factor(ins_notworth,
+                        levels = c("Disagree strongly", "Disagree somewhat",
+                                   "Uncertain", "Agree somewhat", "Agree strongly"),
+                        ordered = TRUE),
+  
+  ins_dontneed2 = factor(ins_dontneed2,
+                         levels = c("Disagree", "Uncertain", "Agree"),
+                         ordered = TRUE),
+  
+  ins_notworth2 = factor(ins_notworth2,
+                         levels = c("Disagree", "Uncertain", "Agree"),
+                         ordered = TRUE),
+  
+  healthstatus = factor(healthstatus,
+                        levels = c("Excellent", "Very good", "Good", "Fair", "Poor"),
+                        ordered = TRUE),
+  
+  healthstatus2 = factor(healthstatus2,
+                        levels = c("Excellent, Very Good, or Good", "Fair or Poor"),
+                        ordered = TRUE),
+  
+  yrexpend_cat = factor(yrexpend_cat,
+                        levels = c("0",
+                                   "Q1: 1–738",
+                                   "Q2: 739–2668",
+                                   "Q3: 2669–8727",
+                                   "Q4: 8728+"),
+                        ordered = TRUE),
+  
+  delayforcost = factor(delayforcost, levels = c("No", "Yes")),
+  labs = factor(labs, levels = c("No", "Yes")),
+  vax = factor(vax, levels = c("No", "Yes")),
+  mammog = factor(mammog, levels = c("No", "Yes")),
+  mri = factor(mri, levels = c("No", "Yes")),
+  xray = factor(xray, levels = c("No", "Yes")),
+  ekg = factor(ekg, levels = c("No", "Yes")),
+  sonogram = factor(sonogram, levels = c("No", "Yes")),
+  surgproc = factor(surgproc, levels = c("No", "Yes")),
+  medpresc = factor(medpresc, levels = c("No", "Yes")),
+  telehealth = factor(telehealth, levels = c("No", "Yes"))
+)
+ptmeps <- ptmeps %>%
+  filter(
+    region != "Inapplicable",   
+    !is.na(healthstatus),
+    !is.na(delayforcost),
+    !is.na(ins_notworth2)
+  )
+```
+
+---
+
+# Question 1: Characterizing Healthcare Users
+## Preliminary Visualizations
+
+#### *Sub-question 1.1: Which groups of individuals have the highest and lowest healthcare spending?* 
+
+Healthcare is notoriously very expensive in the US. I was first interested in using 2023 healthcare expenditures as a proxy for healthcare utilization, and wanted to explore how expenditures vary by characteristics such as age, race/ethnicity, and insurance coverage. For Figure 1a, because healthcare expenditures are highly skewed, I applied a log transformation so that the y-axis is log(1 + expenditures). There appear to be different trends for the younger two age categories compared to the older two: for those in the 0-17 and 18-44 buckets, those with private insurance have slightly higher median expenditures than those with public insurance. Meanwhile, not only do those in the 45-64 and 64+ buckets have the highest expenditures across insurance types, but also in those age groups, those with private insurance have very similar median expenditures compared to those with public insurance. Further, for those 45-64, the uninsured have higher expenditures compared to the uninsured in the other age categories (Figure 1a). Non-Hispanic (NH) White individuals appear to have the highest expenditures among different race and ethnicity groups, and the median expenditures for NH White uninsured is much closer to the median expenditures for private and public insurance enrollees (Figure 1b). 
+   
+```{r 4, echo=FALSE}
+expend_age <- ggplot(ptmeps, aes(x=insurance, y=log1p(yrexpenditures))) +
+  geom_boxplot(fill = "#21918c", color = "#440154", alpha = 0.5) +
+  theme_minimal() +
+  facet_wrap(~ age_cat) +
+  labs(
+    title="1a. Log-Transformed Annual Expenditures by Insurance and Age",
+    x="Insurance",
+    y="Log-Transformed Annual Expenditures"
+  )
+
+expend_age
+
+expend_race <- ggplot(ptmeps, aes(x=insurance, y=log1p(yrexpenditures))) +
+  geom_boxplot(fill = "#21918c", color = "#440154", alpha = 0.5) +
+  theme_minimal() +
+  facet_wrap(~ race) +
+  labs(
+    title="1b. Log-Transformed Annual Expenditures by Insurance and Race",
+    x="Insurance",
+    y="Log-Transformed Annual Expenditures"
+  )
+
+expend_race
+```
+   
+
+I additionally explored those who are *not* utilizing healthcare, for whatever reason. Individuals may utilize less healthcare for a number of reasons, including good health or financial barriers to accessing care. Regarding the latter category, among those who reported having delayed care due to cost barriers, a greater proportion are uninsured compared to among those who have not delayed care (Figure 1c). 
+
+```{r 6, echo=FALSE}
+delay <- ggplot(ptmeps, aes(x=delayforcost, fill=insurance)) +
+geom_bar(position="fill") +
+    scale_y_continuous(labels = scales::percent) +
+theme_minimal() +
+labs(title="1c. Delayed Care by Age and Insurance", x="Delayed Care", y="Percent") +
+  scale_fill_viridis_d(option
+                       = "viridis")
+
+delay
+```
+
+
+Being uninsured is a barrier to accessing healthcare, and I explored two factors potentially related to being uninsured: geographic region (states which have not expanded Medicaid have higher rates of uninsured people) and self-reported health status (people who believe their health to be good may not see a need for insurance). The greatest proportion of the uninsured live in the South, the census region which has had the highest number of states which have not expanded Medicaid (Figure 1d). Distribution of self-reported health status did not vary among the uninsured and privately insured, but those with self-reported poor health were slightly more likely to have public insurance compared to either no insurance or private insurance (Figure 1e). I further explore self-reported health under Question 2.
+
+```{r 7, echo=FALSE}
+region <- ggplot(ptmeps, aes(x = insurance, fill = region)) +
+  geom_bar(position = "fill") +
+  scale_y_continuous(labels = scales::percent) +
+  labs(
+    title = "1d. Insurance Coverage by Region",
+    y = "Percent",
+    x = "Insurance",
+    fill = "Region"
+  ) +
+  theme_minimal() +
+  scale_fill_viridis_d(option
+                       = "viridis")
+region
+
+health <- ggplot(ptmeps, aes(x = insurance, fill = healthstatus)) +
+  geom_bar(position = "fill") +
+  scale_y_continuous(labels = scales::percent) +
+  labs(
+    title = "1e. Insurance Coverage by Self-Reported Health Status",
+    y = "Percent",
+    x = "Insurance",
+    fill = "Health Status"
+  ) +
+  theme_minimal() +
+  scale_fill_viridis_d(option
+                       = "viridis")
+health
+
+```
+
+
+##### *Takeaway 1.1: Which groups of individuals have the highest and lowest healthcare spending? Those with the highest healthcare expenditures appear to be older (45-64 and 65+ years) and White. Those with the lowest healthcare expenditures appear to be younger or those without insurance coverage. However, lacking insurance coverage may suggest the presence of financial barriers to healthcare. At the same time, the uninsured do not significantly self-report their health to be any worse than those with private or public health insurance.* 
+
+
+
+
+## Principle Component Analysis
+
+#### *Sub-question 1.2: How do subgroups of individuals differ in their patterns of healthcare use?*
+
+I next performed dimensionality reduction. I conducted PCA with the following continuous variables: age, income, total healthcare expenditures, and number of emergency room, hospital visits, physician's visits, other outpatient provider's visits, and prescribed medications for 2023.
+
+**PC1** is a reflection of overall healthcare utilization. High PC1 reflects high overall utilization (high expenditures, high number of ER/hospital/physician/outpatient provider visits, high number of prescribed medications). Low PC1 reflects lower overall utilization.
+
+**PC2** is a reflection of acute vs chronic care across different demographics. High PC2 reflects costly acute or episodic care (ER/hospital visits) among individuals who are younger and lower-income. Low PC1 reflects costly chronic outpatient care (more physician and outpatient provider services), and individuals who are older and high-income. Together, PC1 and PC2 only account for roughly half of variance in the data.
+
+```{r 8, echo=FALSE}
+# Subset data for PCA (continuous + binary)
+ptmeps_cont <- c("age", "income", "yrexpenditures", "num_er", "num_hosp", "num_physvis", "num_providvis", "num_prescmeds")
+
+pca <- ptmeps %>%
+  select(age, income, yrexpenditures, num_er, num_hosp, num_physvis, num_providvis, num_prescmeds)
+
+# Scale continuous variables only
+pca_scaled <- pca %>%
+  mutate(across(all_of(ptmeps_cont), scale))
+
+pca_scaled <- na.omit(pca_scaled)
+
+set.seed(123)
+pca_result <- prcomp(pca_scaled, center = TRUE, scale. = FALSE)
+pc <- pca_result$x[, 1:2]  
+
+summary(pca_result)
+
+
+# rotation matrix
+as.data.frame(pca_result$rotation[, 1:2])
+
+
+```
+
+
+I next visualized PC1 and PC2 to explore any visible clusters. When adding color based on insurance, self-reported health status, or other demographic variables, no clear patterns were evident (not shown). Attempts to color by age and income (Figures 1f, 1g) showed more of a pattern, but still no immediately obvious clusters; I will explore clustering outside of the PCA dimensions in the K-Means Clustering section. Figure 1h shows that the variance patterns for the number of ER and hospital visits, which likely reflect acute care utilization, are similar. In contrast, the number of primary care and provider visits, representing more chronic care utilization, show an opposite pattern. Patient age and the number of prescribed medications aligns more closely with the variance pattern of the chronic care visits (Figure 1h). 
+
+```{r 9, echo=FALSE}
+# PCA figure: Age as group
+pca_plot <- as_tibble(pca_result$x) %>%
+  select(PC1:PC2) %>%
+  mutate(age_cat = ptmeps$age_cat)  
+  
+ggplot(pca_plot, aes(PC1, PC2)) +
+  geom_point(aes(color = age_cat), alpha = 0.7) +
+  theme_minimal() +
+  labs(
+    title = "1f. Healthcare Utilization: PC1 vs PC2, Grouped by Age Category",
+    x = "PC1: Care/Services Volume",
+    y = "PC2: Emergency/Acute vs Outpatient/Chronic Care",
+    color = "Age Category"
+  ) +
+  scale_color_viridis_d(option
+                       = "viridis")
+
+# PCA figure: FPL as group
+pca_plot <- as_tibble(pca_result$x) %>%
+  select(PC1:PC2) %>%
+  mutate(fpl_cat = ptmeps$fpl_cat)  
+  
+ggplot(pca_plot, aes(PC1, PC2)) +
+  geom_point(aes(color = fpl_cat), alpha = 0.7) +
+  theme_minimal() +
+  labs(
+    title = "1g. Healthcare Utilization: PC1 vs PC2, Grouped by Income Category",
+    x = "PC1: Care/Services Volume",
+    y = "PC2: Emergency/Acute vs Outpatient/Chronic Care",
+    color = "FPL Category"
+  ) +
+  scale_color_viridis_d(option
+                       = "viridis")
+
+# PCA figure: direction of variance
+fviz_pca_var(pca_result) +
+  ggtitle("1h. Variable Contributions to PCA") +
+  xlab("PC1: Care/Services Volume") +
+  ylab("PC2: Emergency/Acute vs Outpatient/Chronic Care") +
+  scale_color_viridis_d(option
+                       = "viridis")
+
+```
+
+
+
+
+## K-Means Clustering
+
+I then performed k-means clustering with the original scaled variables rather than in the PCA-transformed data. I describe the resulting clusters: 
+- **Cluster 1:** high utilization (particularly ER and hospital visits, labs, imaging, prescriptions); highest expenditures; oldest  
+- **Cluster 2:** moderate to high utilization (particularly outpatient care); low to moderate expenditures
+- **Cluster 3:** low utilization; lowest expenditures; youngest
+
+
+```{r 10, echo=FALSE}
+# Prepare binary variables
+ptmeps <- ptmeps %>%
+  mutate(
+    across(
+      starts_with("ever"),
+      ~ ifelse(is.na(.x), 0, .x)
+    )
+  )
+
+ptmeps_binary <- c("ever_labs","ever_vax","ever_mammog","ever_mri","ever_xray","ever_ekg",
+                   "ever_sonogram","ever_surgproc","ever_medpresc","ever_tele")
+
+# kmeans
+
+kdata <- ptmeps %>%
+  select(
+    age, income, yrexpenditures,
+    num_er, num_hosp, num_physvis,
+    num_providvis, num_prescmeds, 
+    ever_labs, ever_vax, ever_mammog, 
+    ever_mri, ever_xray, ever_ekg, ever_sonogram, 
+    ever_surgproc, ever_medpresc, ever_tele
+  )
+
+kdata_scaled <- kdata %>%
+  drop_na() %>%      
+  scale()
+
+ptmeps_km <- ptmeps %>%
+  drop_na(age, income, yrexpenditures,
+          num_er, num_hosp, num_physvis,
+          num_providvis, num_prescmeds,     ever_labs, ever_vax, ever_mammog, 
+    ever_mri, ever_xray, ever_ekg, ever_sonogram, 
+    ever_surgproc, ever_medpresc, ever_tele
+  )
+
+set.seed(123)
+k <- kmeans(kdata_scaled, centers = 3, nstart = 25)
+
+ptmeps_km <- ptmeps_km %>%
+  mutate(cluster = factor(k$cluster))
+
+# Summary of continuous variables in cluster 
+cluster_cont_summary <- ptmeps_km %>%
+  group_by(cluster) %>%
+  summarise(
+    across(all_of(ptmeps_cont),
+           list(mean = ~mean(.x, na.rm = TRUE),
+                sd = ~sd(.x, na.rm = TRUE)))
+  )
+cluster_cont_summary
+
+# Summary of binary variables in cluster 
+cluster_binary_summary <- ptmeps_km %>%
+  group_by(cluster) %>%
+  summarise(
+    across(all_of(ptmeps_binary), ~mean(.x, na.rm = TRUE))
+  )
+
+cluster_binary_summary
+```
+
+
+```{r 11, echo=FALSE}
+# Extract PCA scores (PC1, PC2)
+pc_scores <- as.data.frame(pca_result$x[, 1:2])
+colnames(pc_scores) <- c("PC1", "PC2")
+
+# k-means
+set.seed(123)
+k <- 3
+
+km <- kmeans(pc_scores, centers = k, nstart = 25)
+
+# plot clusters
+pca_plot_data <- pc_scores %>%
+  mutate(cluster = factor(km$cluster))
+
+clusters <- ggplot(pca_plot_data, aes(PC1, PC2, color = cluster)) +
+  geom_point(alpha = 0.6, size = 2) +
+  labs(
+    title = "1i. K-Means Clusters of Healthcare Utilization (PC1 vs PC2)",
+    x = "PC1: Care/Services Volume",
+    y = "PC2: Emergency/Acute vs Outpatient/Chronic Care",
+    color = "Cluster"
+  ) +
+  theme_minimal() +
+  scale_color_viridis_d(option = "viridis")
+
+clusters
+```
+
+
+Most individuals are in cluster 3, meaning most MEPS respondents are low users of healthcare. Among the uninsured, very few are in cluster 1 (cluster 1 is comprised of the sickest patients, and their care would likely be too expensive without insurance coverage). In contrast, most of the uninsured are in cluster 3, which is characterized by low expenditures (Table 1j). 
+
+```{r 12, echo=FALSE}
+overall_ins <- ggplot(ptmeps_km, aes(x = cluster)) +
+  geom_bar(position = "stack") + 
+  geom_bar(fill = "#440154") +
+  facet_wrap(~ insurance) +
+  labs(
+    title = "1j. Cluster and Insurance Coverage",
+    y = "Count",
+    x = "Cluster"
+  ) +
+  theme_minimal()
+
+overall_ins
+```
+
+
+In addition to variables such as age and income, which were summarized in the cluster profiles above, I was also interested in examining the demographic composition of each cluster. I focused on the race/ethnicity variable: Non-Hispanic White individuals make up a much smaller proportion in the low-user cluster 3 compared to the highest-user cluster 1. In contrast, Hispanic individuals make up a larger proportion in cluster 3 (Table 1k). The demographic composition of the subgroups of healthcare users warrants further exploration. 
+
+```{r 13, echo=FALSE}
+racefill <- ggplot(ptmeps_km, aes(x = cluster, fill = race)) + 
+  geom_bar(position = "fill") +
+  scale_y_continuous(labels = scales::percent) +
+  labs(
+    title = "1k. Race Distribution by Cluster",
+    y = "Percent",
+    x = "Cluster",
+    fill = "Race"
+  ) +
+  theme_minimal() +
+  scale_fill_viridis_d(option
+                       = "viridis")
+racefill
+
+```
+
+
+##### *Takeaway 1.2: How do subgroups of individuals differ in their patterns of healthcare use? Cluster 1 is characterized by the sickest patients with the highest acute healthcare utilization, highest expenditures, and oldest age. Of the continuous variables examined, income seems to drive the least variance. Cluster 2 patients are generally sick as well, but this cluster is characterized by moderate healthcare utilization; they pursue heavy outpatient (rather than acute or emergency) healthcare. Cluster 3 is characterized by low levels of healthcare utilization and younger age.*
+
+
+---
+
+
+# Question 2: Understanding Self-Reported Health 
+## Preliminary Visualizations
+
+#### *Sub-question 2.1: How do measures of utilization align with respondents' beliefs about their own health or their need for insurance?*
+
+Next, I was curious as to whether respondents' self-reported health matched up with their healthcare utilization. If self-reported health and utilization were mismatched, this could suggest that respondents' under- or over-estimate their own health. I again used health expenditures as a proxy for utilization. As seen in Figure 2a, expenditures roughly increase as self-reported health status worsens from excellent to poor.  
+  
+```{r 14, echo=FALSE}
+expend_health <- ggplot(ptmeps, aes(x=insurance, y=log1p(yrexpenditures))) +
+  geom_boxplot(fill = "#21918c", color = "#440154", alpha = 0.5) +
+   facet_wrap(~ healthstatus) +
+  theme_minimal() +
+  labs(
+    title="2a. Log-Transformed Annual Expenditures by Insurance and Health Status",
+    x="Self-Reported Health Status",
+    y="Log-Transformed Annual Expenditures"
+  )
+
+expend_health
+
+```
+
+
+Though people with self-reported worse health did in fact spend more on their care, they may have difficulty paying for necessary care. Of potential concern regarding the costliness of healthcare, the uninsured individuals reporting the highest median expenditures belonged to the "fair" and "poor" health groups (Figure 2a). Similarly, as self-reported health worsens, an increasing proportion of individuals reported that they have delayed care due to high costs (Figure 2b). Interestingly, a greater proportion of those who have delayed care because of the cost (compared to those who have not delayed care) reported agreeing that insurance is not worth the cost. This may suggest that some respondents were overconfident regarding their need for insurance (Figure 2c).
+
+```{r 15, echo=FALSE}
+delay_health <- ggplot(ptmeps, aes(x = healthstatus, fill = delayforcost)) +
+  geom_bar(position = "fill") +
+  scale_y_continuous(labels = scales::percent) +
+  labs(
+    title = "2b. Delayed Care by Health Status",
+    y = "Percent",
+    x = "Self-Reported Health Status",
+    fill = "Delayed Care"
+  ) +
+  theme_minimal() +
+  scale_fill_viridis_d(option
+                       = "viridis")
+delay_health
+
+notworth <- ggplot(ptmeps, aes(x = delayforcost, fill = ins_notworth2)) +
+  geom_bar(position = "fill") +
+  scale_y_continuous(labels = scales::percent) +
+  labs(
+    title = "2c. Need for Insurance by Delayed Care",
+    y = "Percent",
+    x = "Delayed Care",
+    fill = "'Insurance is Not Worth the Cost'"
+  ) +
+  theme_minimal() +
+  scale_fill_viridis_d(option
+                       = "viridis")
+notworth
+
+```
+
+
+I  analyzed the healthcare utilization clusters from Question 1 and found that the proportion of each health status within each cluster varies somewhat. Cluster 1, composed of the highest healthcare spenders, had the most distinct distribution compared to the more similar clusters 2 and 3. People with fair or poor health were more likely, and people with very good or excellent health were less likely, to be in cluster 1 (Figure 2d). 
+
+```{r 16, echo=FALSE}
+clusters_health <- ggplot(ptmeps_km, aes(x = cluster, fill = healthstatus)) +
+  geom_bar(position = "fill") +
+  scale_y_continuous(labels = scales::percent) +
+  labs(
+    title = "2d. Health Status by Cluster",
+    y = "Percent",
+    x = "Cluster",
+    fill = "Self-Reported Health Status"
+  ) +
+  theme_minimal() +
+  scale_fill_viridis_d(option
+                       = "viridis")
+
+clusters_health
+
+
+```
+
+
+##### *Takeaway 2.1: How do measures of utilization align with respondents' beliefs about their own health or their need for insurance? Overall, respondents' healthcare utilization does seem to align with their self-reported health. Higher healthcare spending was seen among those with self-reported fair or poor health, and the utilization clusters have predictable distributions of health status: many in the low-use cluster 3 report excellent health while very few report poor health, and the opposite can be seen in the highest-use cluster 1. However, financial barriers and beliefs about need for insurance complicate the picture. People with fair or poor health who are uninsured still show relatively high expenditures, and those in worse health are also slightly more likely to delay care because of cost. If there is a causal relationship between self-reported health and having delayed cost, the direction of this relationship could be interesting for future research.*
+
+
+
+
+## Logistic Regression
+
+#### *Sub-question 2.2: Which demographic or healthcare utilization characteristics predict self-reported fair/poor health?*
+  
+Finally, I performed a logistic regression with a binary self-reported health status outcome: excellent/very good/good vs fair/poor health. I was interested in determining which characteristics, if any, were associated with self-reporting worse health, and I aimed to explore whether demographic or utilization variables were more strongly associated with this outcome.
+
+```{r 18, echo=FALSE}
+# Order for logistic regression 
+ptmeps <- ptmeps %>%
+  mutate(
+age_cat_new = factor(age_cat, levels = c("18–44", "0–17", "45–64", "65+"), ordered = FALSE),
+fpl_cat_new = factor(fpl_cat, levels = c("High Income", "Middle Income", "Low Income", "Near Poor", "Poor"), ordered = FALSE)
+)
+
+# Logistic regression
+model <- glm(
+  healthstatus2 ~ age_cat_new + sex + race + region + fpl_cat_new + insurance +
+    bornusa + deg_cat + yrexpenditures + num_er + num_hosp + num_physvis +
+    num_providvis + num_prescmeds, 
+  data = ptmeps,
+  family = binomial(link = "logit")
+)
+
+# View ORs
+options(scipen = 999)
+
+exp(cbind(OR = coef(model), confint(model)))
+```
+
+
+Figure 2e depicts those coefficients which are most strongly associated with self-reporting fair/poor health. The two predictors with the greatest magnitude are an income category of poor (compared to high income) and near poor (also compared to high income). The other income categories additionally have influence on self-reported fair/poor health. Educational attainment additionally appears to be influential. The most protective predictors were having a master's or doctorate degree. Healthcare utilization does not appear to be a strong predictor; the utilization-related predictor with the greatest magnitude is the number of hospital visits in 2023, and this is the 9th on the list in terms of magnitude (Figure 2e).
+
+```{r 19, echo=FALSE}
+coef_df <- tidy(model) %>%
+  filter(term != "(Intercept)") %>%
+  mutate(
+    odds_ratio = exp(estimate),
+    distance = abs(odds_ratio - 1),
+    sign = factor(sign(estimate), levels = c(-1, 1)),
+    variable = fct_reorder(term, distance)
+  )
+
+coef_df <- coef_df %>%
+  mutate(variable = fct_reorder(term, odds_ratio))
+
+# Rename variables/levels
+new_names <- c(
+"age_cat_new0–17" = "0-17 years",                   
+"age_cat_new45–64" = "45-64 years",                    
+"age_cat_new65+" = "65+ years",                     
+"sexFemale" = "Female",                        
+"raceHispanic" = "Hispanic",                   
+"raceNon-Hispanic Black" = "Non-Hispanic Black",             
+"raceNon-Hispanic Asian" = "Non-Hispanic Asian",            
+"raceNon-Hispanic Other or Multiple" = "Non-Hispanic Other or Multiple", 
+"regionMidwest" = "Midwest",                    
+"regionSouth" = "South",
+"regionWest" = "West",                         
+"regionInapplicable" = "region NA",                 
+"fpl_cat_newMiddle Income" = "Middle Income",          
+"fpl_cat_newLow Income" = "Low Income",  
+"fpl_cat_newNear Poor" = "Near Poor",                
+"fpl_cat_newPoor" = "Poor",  
+"insurancePublic" = "Public Insurance",                     
+"insuranceUninsured" = "Uninsured", 
+"bornusaNo" = "Not Born in US",                         
+"deg_catLess than high school" = "Less Than High School",
+"deg_catHigh school diploma" = "High School Diploma",        
+"deg_catMaster's degree" = "Master's Degree",
+"deg_catDoctorate degree" = "Doctorate Degree",           
+"deg_catOther degree" = "Other Degree",
+"deg_catInapplicable (<16)" = "Degree N/A (<16 years)",
+"num_er" = "# of ER Visits",
+"num_hosp" = "# of Hospital Visits",                        
+"num_physvis" = "# of Physician Visits",  
+"num_providvis" = "# of Outpatient Provider Visits",                      
+"num_prescmeds" = "# of Prescribed Meds"   
+)
+
+# Plot ORS
+ggplot(coef_df, aes(x = odds_ratio, y = variable, fill = sign)) +
+  geom_col() +
+  scale_fill_manual(values = c("-1" = "#440154", "1" = "#21918c"),
+                    name = "Coefficient Sign") +
+  scale_y_discrete(labels = new_names) + 
+  labs(
+    x = "Odds Ratio Value",
+    y = "Variable",
+    title = "2e. Logistic Regression Odds Ratios"
+  ) +
+  theme_minimal(base_size = 14)
+```
+  
+  
+##### *Takeaway 2.2: Which demographic or healthcare utilization characteristics predict self-reported fair/poor health? The predictors of the greatest magnitude were related to demographics and social determinants of health (primarily income and educational attainment, though region and race had some influence as well). By magnitude, any variables related to healthcare utilization appeared to have less influence on self-reporting fair/poor health. As healthcare utilization was found to be somewhat associated with self-reported health status in above sections, this finding speaks to the potentially even greater association between the social determinants of health and self-reported worse health.*
+
+
+---
+
+
+# Conclusion
+
+In this analysis, I explored MEPS data to examine patterns in healthcare utilization, healthcare spending, self-reported health and insurance needs, and demographic characteristics in 2023. Broadly, my conclusions are as follows:
+
+- *Healthcare utilization can roughly be split into 3 categories:* the first includes people who are older or who have quite expensive healthcare needs, include many acute or emergency service needs and many medications; the second includes people with high outpatient use, potentially for chronic diseases; the third includes people who are younger or who have very low healthcare expenditures. As the third group is the largest, this suggests it is older patients and those few with extremely high healthcare expenditures driving high US healthcare spending. Though private and public insurance are the most common coverage types among MEPS respondents, the uninsured are a subgroup of interest, especially as those with self-reported fair and poor health have relatively high expenditures. The uninsured, perhaps predictably, were most common in the third, low-use group and least common in the first, high-use group.
+  - In future analyses, I would be interested in exploring those who may possess financial barriers to healthcare access, such as: those with the highest healthcare spending like in cluster 1, the uninsured, those who reported having to delay healthcare due to the cost, and those who reported agreeing that insurance is not worth the cost. I would analyze whether those variables are independently correlated.
+  
+- *Self-reported health and healthcare utilization largely align,* with those self-reporting excellent and very good health having lower expenditures than those self-reporting fair and poor health. However, demographic characteristics such as income and educational attainment, rather than characteristics related to utilization, are more important for predicting self-reporting fair or poor health. The social determinants of health therefore are important to consider when studying self-reported health metrics.
+  - I am left with questions about those individuals who both had to delay care due to the cost and reported that they agree that insurance is not worth the cost. This seems to be paradoxical, but may be reflective of otherwise healthy individuals who experienced a costly accident. In future analyses, I would "zoom in" on this subsection of the dataset and aim to characterize these individuals. I would additionally explore which variables predict agreement that insurance is not worth the cost: demographic or utilization-related characteristics?
+  - Given the odds ratios resulting from the logistic regression, in future analyses I would further stratify self-reported health status and insurance belief variables by demographic characteristics. I would additionally perform LASSO regression to see which variables "zero" out and are less important for predicting self-reported fair or poor health.
+  
+- The data I used were restricted to a single year. In future analyses, I would be interested in working with more longitudinal data and comparing trends in 2023 compared to 2020. I am curious as to whether self-reported health status, and the alignment between self-reported health status and actual healthcare utilization as proxied by healthcare expenditures, was different early in the pandemic (2020) compared to later in it (2023). 
+
+
