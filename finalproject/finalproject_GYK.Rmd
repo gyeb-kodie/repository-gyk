@@ -114,10 +114,10 @@ library(haven)
 ```
 
 ```{r 2, echo=FALSE}
-h248g = read_excel("C:/Users/gryeboah/Desktop/gillings/2_fall/bios512/finalproject/h248g.xlsx")
+h248g = read_excel("~h248g.xlsx")
 # LINK FOR full hc248g: https://meps.ahrq.gov/data_stats/download_data_files_detail.jsp?cboPufNumber=HC-251
 
-h251 = read_excel("C:/Users/gryeboah/Desktop/gillings/2_fall/bios512/finalproject/h251.xlsx")
+h251 = read_excel("~h251.xlsx")
 # LINK FOR full hc251: https://meps.ahrq.gov/data_stats/download_data_files_detail.jsp?cboPufNumber=HC-248G
 
 # Prepare datasets 
@@ -857,5 +857,6 @@ In this analysis, I explored MEPS data to examine patterns in healthcare utiliza
   - Given the odds ratios resulting from the logistic regression, in future analyses I would further stratify self-reported health status and insurance belief variables by demographic characteristics. I would additionally perform LASSO regression to see which variables "zero" out and are less important for predicting self-reported fair or poor health.
   
 - The data I used were restricted to a single year. In future analyses, I would be interested in working with more longitudinal data and comparing trends in 2023 compared to 2020. I am curious as to whether self-reported health status, and the alignment between self-reported health status and actual healthcare utilization as proxied by healthcare expenditures, was different early in the pandemic (2020) compared to later in it (2023). 
+
 
 
